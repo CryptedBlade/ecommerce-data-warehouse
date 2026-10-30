@@ -1,4 +1,20 @@
-﻿venv/
-__pycache__/
-*.pyc
+# Data files are not committed (download the Olist dataset from Kaggle)
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+# Secrets and environments
 .env
+venv/
+.venv/
+
+# Python and Jupyter
+__pycache__/
+.ipynb_checkpoints/
+*.pyc
+
+# OS and editor
+.DS_Store
+Thumbs.db
+.vscode/

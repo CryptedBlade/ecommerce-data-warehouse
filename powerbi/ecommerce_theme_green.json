@@ -1,0 +1,27 @@
+{
+  "name": "Ecommerce Deep Green",
+  "dataColors": ["#95BF47", "#3DD6B0", "#5AA9E6", "#F2C94C", "#FF7A59", "#9B8AFB", "#6FCF97", "#8A99AD"],
+  "background": "#153229",
+  "foreground": "#FFFFFF",
+  "tableAccent": "#95BF47",
+  "good": "#3DD6B0",
+  "neutral": "#F2C94C",
+  "bad": "#FF7A59",
+  "maximum": "#95BF47",
+  "center": "#F2C94C",
+  "minimum": "#3DD6B0",
+  "visualStyles": {
+    "page": {
+      "*": {
+        "background": [{ "color": { "solid": { "color": "#0D1F1A" } }, "transparency": 0 }]
+      }
+    },
+    "*": {
+      "*": {
+        "title": [{ "fontColor": { "solid": { "color": "#FFFFFF" } }, "fontFamily": "Segoe UI Semibold" }],
+        "background": [{ "color": { "solid": { "color": "#153229" } }, "transparency": 0, "show": true }],
+        "border": [{ "show": false }]
+      }
+    }
+  }
+}

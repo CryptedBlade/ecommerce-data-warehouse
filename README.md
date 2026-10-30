@@ -1,108 +1,100 @@
-# E-Commerce Data Warehouse + BI Dashboard
+# E-Commerce Analytics Warehouse
 
-End-to-end data warehouse project modeling e-commerce order data into a star
-schema, with Python ETL, advanced SQL analytics, and a Power BI dashboard.
+End-to-end analytics project on the real **Olist Brazilian e-commerce dataset** (99,441 orders, 2016 to 2018): a Python cleaning pipeline, a **PostgreSQL star schema**, and a **six-page Power BI dashboard** with a dark green theme.
 
----
+> **Version 2.** The first version of this repository used generated sample data. It has been rebuilt from scratch on the real Olist data, with the payment, review and delivery logic corrected. The old version is kept under the tag `v1-sample-data`.
 
-## Skills Demonstrated
+## Dashboard
 
-| Skill | Where |
+| | |
 |---|---|
-| Star Schema Design | `sql/ddl/create_tables.sql` — 1 fact + 4 dimension tables |
-| Window Functions | `sql/queries/advanced_queries.sql` — RANK, LAG, NTILE, ROW_NUMBER, FIRST_VALUE, SUM/AVG OVER |
-| Dynamic SQL | `src/load_to_postgres.py` — row-count validation across variable table names |
-| Pivoting / Unpivoting | `sql/queries/advanced_queries.sql` — Queries 11–12, monthly category revenue |
-| ETL Pipeline | `src/etl_pipeline.py` — Pandas-based cleaning, dedup, transformation |
-| BI Dashboarding | `dashboard/ecommerce_dashboard.pbix` — Power BI connected to PostgreSQL |
+| ![Executive overview](docs/screenshots/01_executive_overview.png) | ![Sales and revenue trends](docs/screenshots/02_sales_and_revenue_trends.png) |
+| ![Products and categories](docs/screenshots/03_products_and_categories.png) | ![Customers and retention](docs/screenshots/04_customers_and_retention.png) |
+| ![Orders and fulfilment](docs/screenshots/05_orders_and_fulfilment.png) | ![Insights and recommendations](docs/screenshots/06_insights_and_recommendations.png) |
 
----
+## Headline results
 
-## Tech Stack
+Jan 2017 to Aug 2018 is used for trends, because Sep to Dec 2016 and Sep to Oct 2018 are nearly empty.
 
-| Layer | Tools |
+| Metric | Value |
 |---|---|
-| Data Generation / ETL | Python 3.10+, Pandas, NumPy, Faker |
-| Data Warehouse | PostgreSQL 14+ |
-| Visualizations | Matplotlib, Seaborn |
-| BI Dashboard | Power BI Desktop |
-| Version Control | Git / GitHub |
+| Product revenue | R$13.49M (98,199 orders, average order value R$137.42) |
+| Freight revenue | R$2.24M (16.6% of product revenue) |
+| Customers | 95.0K unique customers |
+| Average review score | 4.09 out of 5 |
+| Average delivery time | 12.6 days, 93.2% delivered on time (6.8% late) |
+| Peak month | Nov 2017 (Black Friday), R$1.00M |
+| Payment method | Credit card on 75.5% of orders, 51.5% paid in installments |
 
----
+## What the data says
 
-## Project Structure
+- **Demand is concentrated.** Sao Paulo customers bring 38.3% of revenue. Sao Paulo sellers earn 64.4%, and the top 10% of sellers (305 of 3,053) earn 67.4% of it.
+- **Retention is thin.** Only 3.0% of customers (2,887 of 94,983) ordered more than once, a median 28 days after their first order. Repeat customers bring 5.6% of revenue.
+- **Late delivery hurts ratings.** Late orders average 2.27 stars against 4.29 for on-time orders. Delivery to Para takes 23.8 days against 8.8 in Sao Paulo.
+- **The category base is narrow.** 18 of 73 categories earn 80% of revenue, and the top 10 bring 62.4%.
 
-ecommerce-data-warehouse/
-├── data/
-│   ├── raw/              # Original CSVs (Kaggle or generated)
-│   └── processed/        # Cleaned fact & dimension tables
-├── src/
-│   ├── generate_sample_data.py   # Generates realistic test data
-│   ├── etl_pipeline.py           # Full cleaning + transformation + star schema build
-│   ├── load_to_postgres.py       # Loads processed CSVs into PostgreSQL
-│   └── eda_and_visualizations.py # EDA charts saved to dashboard/screenshots/
-├── sql/
-│   ├── ddl/
-│   │   └── create_tables.sql     # Star schema DDL + indexes
-│   └── queries/
-│       └── advanced_queries.sql  # 12 analytical queries (window fns, dynamic SQL, pivot/unpivot)
-├── dashboard/
-│   ├── ecommerce_dashboard.pbix  # Power BI file
-│   └── screenshots/              # Chart PNGs
-├── docs/
-│   └── data_dictionary.md        # Column-level documentation
-├── run_all.py                    # One-click full pipeline runner
-├── requirements.txt
-├── .env.example
-└── README.md
+## Architecture
 
----
-
-## Quick Start
-
-### 1. Clone & install dependencies
-
-```bash
-git clone https://github.com/CryptedBlade/ecommerce-data-warehouse.git
-cd ecommerce-data-warehouse
-python -m venv venv
-source venv/bin/activate        # Windows: venv\Scripts\activate
-pip install -r requirements.txt
+```
+Kaggle CSV files  ->  Python / pandas  ->  PostgreSQL star schema  ->  Power BI
+(9 Olist tables)      audit and clean      dw.* tables, SQL          6 pages, DAX measures
 ```
 
-### 2. Configure environment
+## Data model
 
-```bash
-cp .env.example .env
-# Edit .env with your PostgreSQL credentials
+```mermaid
+erDiagram
+    dim_customers ||--o{ fact_orders : places
+    dim_date ||--o{ fact_orders : "purchased on"
+    fact_orders ||--|{ fact_order_items : contains
+    dim_products ||--o{ fact_order_items : "sold as"
+    dim_sellers ||--o{ fact_order_items : "sold by"
 ```
 
-### 3. Run the full pipeline
+| Table | Grain (one row is...) |
+|---|---|
+| `fact_order_items` | one product unit sold: price, freight |
+| `fact_orders` | one order: status, delivery, payment summary, review, customer sequence |
+| `dim_customers` | one real person (`customer_unique_id`) |
+| `dim_products` | one product, with English category names |
+| `dim_sellers` | one seller |
+| `dim_date` | one calendar day |
 
-```bash
-# Option A — full run including PostgreSQL load
-python run_all.py
+## Key modelling decisions
 
-# Option B — skip PostgreSQL (CSV only, no DB required)
-python run_all.py --skip-db
+- **Revenue rule.** Canceled and unavailable orders stay in the tables but are flagged `is_revenue_order = false`. Orders without items are excluded too.
+- **Payments are collapsed to one row per order** before joining, because 3,400 orders were paid in several parts. Joining raw payments would double-count revenue. Payments reconcile with item price plus freight for 99.7% of orders.
+- **Reviews are reduced to one per order**, keeping the latest, because some orders have several.
+- **Customers are one row per person.** In Olist, `customer_id` is created per order, so 99,441 IDs map to only 96,096 people.
+- **Late means delivered after the promised date**, compared by calendar day. Delivery metrics use delivered orders with a delivery date.
+- **Locations** come from a zip-code table collapsed to one median point per zip, with 42 coordinates outside Brazil removed. Leading zeros in zip codes are restored.
+- **Customer sequence columns** (order number, days since previous order, cohort month) are added in SQL with window functions to support repeat-purchase and retention measures.
+- **Two missing category translations** (`pc_gamer` and `portateis_cozinha_e_preparadores_de_alimentos`) are added by hand, and products with no category are labelled `unknown`.
+
+## Repository structure
+
+```
+ecommerce-analytics-warehouse
+├── notebooks/        01_data_audit_and_cleaning.ipynb  (audit, cleaning, modelling, load)
+├── sql/              01_create_schema_and_tables.sql, 02_add_customer_sequence_columns.sql
+├── powerbi/          ecommerce_analytics_dashboard.pbix
+├── docs/screenshots/ dashboard page images
+└── data/             raw and processed folders (data files are not committed)
 ```
 
-### 4. Run steps individually
+## How to run it
 
-```bash
-python src/generate_sample_data.py    # Generate sample data (or use real Kaggle CSVs in data/raw/)
-python src/etl_pipeline.py            # Clean, transform, build star schema CSVs
-python src/eda_and_visualizations.py  # Generate EDA charts
-python src/load_to_postgres.py        # Load into PostgreSQL
-```
+1. Download the [Olist dataset from Kaggle](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce) and put the 9 CSV files in `data/raw/`.
+2. Install the requirements: `pip install -r requirements.txt`.
+3. Create a PostgreSQL database named `ecommerce_analytics_dw` and run `sql/01_create_schema_and_tables.sql`.
+4. Run `notebooks/01_data_audit_and_cleaning.ipynb` from the top. It asks for your PostgreSQL password when it connects, and loads the six warehouse tables.
+5. Run `sql/02_add_customer_sequence_columns.sql`. (Re-run it whenever the notebook reloads the tables.)
+6. Open `powerbi/ecommerce_analytics_dashboard.pbix` and point it at your database.
 
-### 5. Connect Power BI
+## Tools
 
-1. Open `dashboard/ecommerce_dashboard.pbix` in Power BI Desktop
-2. Go to **Home → Transform data → Data source settings**
-3. Update the PostgreSQL server/database to match your `.env`
-4. Click **Refresh**
+Python (pandas, SQLAlchemy), PostgreSQL 18, SQL window functions, Power BI (DAX, star-schema modelling), Jupyter.
 
----
+## Data source
 
-## Star Schema
+[Brazilian E-Commerce Public Dataset by Olist](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce), licensed CC BY-NC-SA 4.0.
